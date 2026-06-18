@@ -32,6 +32,24 @@ class CorrelationStore {
     return res.rows;
   }
 
+  async recordAlert({ alertId, ruleId, severity, relatedTxIds, blockchainTxId }) {
+    await this.pool.query(
+      `INSERT INTO mw.alert_index (alert_id, rule_id, severity, related_tx_ids, blockchain_tx_id)
+       VALUES ($1,$2,$3,$4,$5) ON CONFLICT (alert_id) DO NOTHING`,
+      [alertId, ruleId, severity, JSON.stringify(relatedTxIds), blockchainTxId]);
+  }
+
+  // Alertes touchant l'une des transactions fournies (operateur JSONB ?|)
+  async findAlertsForSigIds(sigIds) {
+    if (sigIds.length === 0) return [];
+    const res = await this.pool.query(
+      `SELECT alert_id, rule_id, severity, related_tx_ids, blockchain_tx_id, detected_at
+         FROM mw.alert_index
+        WHERE related_tx_ids ?| $1::text[]
+        ORDER BY detected_at`, [sigIds]);
+    return res.rows;
+  }
+
   async close() { await this.pool.end(); }
 }
 

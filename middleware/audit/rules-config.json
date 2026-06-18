@@ -1,0 +1,9 @@
+{
+  "rules": [
+    { "ruleId": "R1", "label": "Double depot suspect",   "enabled": true, "severity": "HIGH",   "params": { "windowSeconds": 300 } },
+    { "ruleId": "R2", "label": "Depassement de plafond", "enabled": true, "severity": "HIGH",   "params": { "maxAmount": 1000000, "currency": "XOF" } },
+    { "ruleId": "R3", "label": "Transaction hors horaire","enabled": true, "severity": "MEDIUM", "params": { "openHour": 8, "closeHour": 17 } },
+    { "ruleId": "R4", "label": "Incoherence flux",       "enabled": true, "severity": "MEDIUM", "params": { "maxNetFlowPerMember": 2000000 } },
+    { "ruleId": "R5", "label": "Agent multi-comptes",    "enabled": true, "severity": "HIGH",   "params": { "maxTxPerHour": 5 } }
+  ]
+}
