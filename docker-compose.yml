@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sfd-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${PGUSER:-sfd}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-sfd_password}
+      POSTGRES_DB: ${PGDATABASE:-sfd_sig}
+    ports:
+      - "${PGPORT:-5432}:5432"
+    volumes:
+      - sfd_pgdata:/var/lib/postgresql/data
+      - ./sig-simulator/init.sql:/docker-entrypoint-initdb.d/01-sig.sql:ro
+      - ./middleware/db/schema.sql:/docker-entrypoint-initdb.d/02-mw.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PGUSER:-sfd} -d ${PGDATABASE:-sfd_sig}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  sfd_pgdata:
