@@ -1,0 +1,25 @@
+{
+  "name": "sfd-middleware",
+  "version": "1.0.0",
+  "private": true,
+  "main": "api/server.js",
+  "scripts": {
+    "start": "node api/server.js",
+    "dry-run": "node dry-run-ingest.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.2",
+    "@hyperledger/fabric-gateway": "^1.7.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.15.2",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
