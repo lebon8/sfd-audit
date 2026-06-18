@@ -72,4 +72,15 @@ async function verifyReport(reportId, filePath) {
   }
 }
 
-module.exports = { generateReport, verifyReport };
+async function verifyReportByHash(reportId, fileHash) {
+  const gateway = new GatewayClient().connect();
+  try {
+    let cert;
+    try { cert = JSON.parse(await gateway.evaluate('getReportCertification', reportId)); }
+    catch { return { status: 'UNKNOWN', message: 'Rapport non certifie ou introuvable' }; }
+    return { status: fileHash === cert.reportHash ? 'VALID' : 'TAMPERED',
+             reportId, anchoredHash: cert.reportHash, fileHash, certifiedAt: cert.certifiedAt };
+  } finally { gateway.close(); }
+}
+
+module.exports = { generateReport, verifyReport, verifyReportByHash };

@@ -50,6 +50,14 @@ class CorrelationStore {
     return res.rows;
   }
 
+  async findAlerts({ severity, rule } = {}) {
+    const res = await this.pool.query(
+      `SELECT alert_id, rule_id, severity, related_tx_ids, blockchain_tx_id, detected_at
+         FROM mw.alert_index ORDER BY detected_at DESC`);
+    return res.rows.filter((r) => !severity || r.severity === severity)
+                   .filter((r) => !rule || r.rule_id === rule);
+  }
+
   async close() { await this.pool.end(); }
 }
 

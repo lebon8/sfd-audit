@@ -1,8 +1,8 @@
 'use strict';
-
 const JDBCAdapter = require('./adapters/jdbc-adapter');
 const { toPivot } = require('./engine/canonical-mapper');
 const { canonicalStringify } = require('./engine/hasher');
+const { validateEvent } = require('./engine/validator');
 const { GatewayClient } = require('./fabric-gateway/gateway');
 const { CorrelationStore } = require('./db/correlation');
 
@@ -15,10 +15,18 @@ async function runIngestCycle() {
   gateway.connect();
 
   const envelopes = await adapter.consume();
-  let anchored = 0, failed = 0;
+  let anchored = 0, failed = 0, rejected = 0;
 
   for (const env of envelopes) {
     const pivot = toPivot(env);
+
+    const { valid, errors } = validateEvent(pivot);   // defense en profondeur
+    if (!valid) {
+      console.error(`Evenement ${env.sigId} rejete (schema) : ${errors.join('; ')}`);
+      rejected++;
+      continue;
+    }
+
     const { eventId, eventType, eventTimestamp } = pivot.eventMetadata;
     const payloadJson = canonicalStringify(pivot.payload);
     const sourceHash = pivot.integrityProof.sourceHash;
@@ -36,7 +44,7 @@ async function runIngestCycle() {
   await adapter.disconnect();
   await store.close();
   gateway.close();
-  return { consumed: envelopes.length, anchored, failed };
+  return { consumed: envelopes.length, anchored, failed, rejected };
 }
 
 module.exports = { runIngestCycle };
