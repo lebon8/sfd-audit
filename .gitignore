@@ -1,0 +1,21 @@
+# Dépendances
+node_modules/
+
+# Secrets et environnement
+.env
+*.env.local
+
+# Identités / wallets Fabric
+wallet/
+*.id
+*.pem.key
+
+# Artefacts
+*.log
+dist/
+coverage/
+reports/*.pdf
+
+# OS / éditeur
+.DS_Store
+.vscode/settings.json
