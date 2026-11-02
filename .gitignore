@@ -19,3 +19,7 @@ reports/*.pdf
 # OS / éditeur
 .DS_Store
 .vscode/settings.json
+
+middleware/keys/
+.api.pid
+api.log

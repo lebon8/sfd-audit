@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SFD AgnosticTrace — Console d'audit</title>
+<style>
+  :root{--nuit:#0f2233;--ocean:#12506b;--aube:#2f8fb3;--or:#c9922e;--sable:#eef3f6;--encre:#12212b;
+        --ok:#1f9d55;--warn:#c98a1e;--danger:#c0392b;--muted:#6b8494;--line:#d8e2e8;}
+  *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,sans-serif;}
+  body{margin:0;background:var(--sable);color:var(--encre);}
+  header{background:var(--nuit);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:12px;}
+  header h1{font-size:17px;margin:0;font-weight:600;letter-spacing:.3px;}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--danger);}
+  .dot.on{background:var(--ok);}
+  main{max-width:1100px;margin:0 auto;padding:22px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:18px;}
+  .login{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  input,button{font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);}
+  input{min-width:220px;}
+  button{background:var(--ocean);color:#fff;border:none;cursor:pointer;}
+  button:hover{background:var(--aube);}
+  button.ghost{background:#fff;color:var(--ocean);border:1px solid var(--ocean);}
+  button.gold{background:var(--or);}
+  .hidden{display:none;}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center;}
+  .kpi .v{font-size:24px;font-weight:700;color:var(--nuit);}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px;}
+  h2{font-size:15px;color:var(--ocean);margin:0 0 12px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;}
+  code{font-family:ui-monospace,monospace;font-size:12px;color:var(--ocean);}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;}
+  .HIGH{background:var(--danger);} .MEDIUM{background:var(--warn);} .LOW{background:var(--muted);}
+  .VALID{background:var(--ok);} .TAMPERED{background:var(--danger);}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .muted{color:var(--muted);font-size:13px;}
+  #toast{position:fixed;right:20px;bottom:20px;background:var(--nuit);color:#fff;padding:12px 16px;border-radius:8px;opacity:0;transition:.3s;}
+  #toast.show{opacity:1;}
+  @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr);}.grid2{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>SFD — Console d'audit</h1>
+  <span class="muted" id="conn" style="color:#9fc2d4;margin-left:auto;font-size:12px;">Non connecté</span>
+</header>
+
+<main>
+  <div class="card" id="loginCard">
+    <div class="login">
+      <label class="muted">Clé API :</label>
+      <input id="apiKey" value="demo-sig-key-123"/>
+      <button onclick="connect()">Se connecter</button>
+      <span class="muted">La clé délivre un JWT ; le tableau de bord ne consomme ensuite que l'API REST.</span>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="ghost" onclick="refresh()">↻ Rafraîchir</button>
+        <button onclick="injectTx(10)">+ Transaction normale (webhook)</button>
+        <button class="gold" onclick="injectTx(23)">+ Transaction hors-horaire (webhook)</button>
+        <span class="muted" id="injectMsg"></span>
+      </div>
+
+      <div class="grid2">
+        <div>
+          <h2>Événements certifiés (récents)</h2>
+          <table><thead><tr><th>Type</th><th>Sig ID</th><th>Horodatage</th><th>Tx blockchain</th></tr></thead>
+          <tbody id="events"></tbody></table>
+        </div>
+        <div>
+          <h2>Alertes d'audit</h2>
+          <table><thead><tr><th>Règle</th><th>Sévérité</th><th>Transactions</th><th>Tx</th></tr></thead>
+          <tbody id="alerts"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Rapport d'audit certifié</h2>
+      <div class="toolbar">
+        <button onclick="genReport()">Générer un rapport</button>
+        <span class="muted" id="reportMsg"></span>
+      </div>
+      <div id="reportBox"></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let token = null, apiKey = null, lastReportId = null;
+const $ = (id) => document.getElementById(id);
+const api = (p, opts={}) => fetch(p, { ...opts, headers: { 'Authorization': 'Bearer '+token, 'Content-Type':'application/json', ...(opts.headers||{}) }});
+const toast = (m) => { const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2600); };
+const short = (s,n=10) => s ? s.slice(0,n)+'…' : '—';
+
+async function connect(){
+  apiKey = $('apiKey').value.trim();
+  try{
+    const r = await fetch('/api/v1/auth/token', { method:'POST', headers:{'X-SIG-API-Key':apiKey}});
+    if(!r.ok) throw new Error('Clé API refusée');
+    token = (await r.json()).token;
+    $('dot').classList.add('on'); $('conn').textContent='Connecté'; $('conn').style.color='#8fe3b0';
+    $('loginCard').classList.add('hidden'); $('app').classList.remove('hidden');
+    refresh();
+  }catch(e){ toast(e.message); }
+}
+
+async function refresh(){ await Promise.all([loadStats(), loadEvents(), loadAlerts()]); }
+
+async function loadStats(){
+  const s = await (await api('/api/v1/stats')).json();
+  const cards = [
+    ['Événements', s.totalEvents], ['Transactions', s.totalTransactions],
+    ['Logs', s.totalLogs], ['Montant (XOF)', (s.totalAmount||0).toLocaleString('fr-FR')],
+    ['Alertes', s.totalAlerts||0],
+  ];
+  $('kpis').innerHTML = cards.map(([l,v])=>`<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+}
+
+async function loadEvents(){
+  const rows = await (await api('/api/v1/events')).json();
+  $('events').innerHTML = rows.slice(-12).reverse().map(r=>`<tr>
+    <td>${r.event_type}</td><td><code>${r.sig_id}</code></td>
+    <td>${new Date(r.event_timestamp).toLocaleString('fr-FR')}</td>
+    <td><code>${short(r.blockchain_tx_id)}</code></td></tr>`).join('') || emptyRow(4);
+}
+
+async function loadAlerts(){
+  const rows = await (await api('/api/v1/audit/alerts')).json();
+  $('alerts').innerHTML = rows.map(a=>`<tr>
+    <td>${a.rule_id}</td><td><span class="badge ${a.severity}">${a.severity}</span></td>
+    <td>${(a.related_tx_ids||[]).map(x=>x.slice(0,10)+'…').join(', ')}</td>
+    <td><code>${short(a.blockchain_tx_id)}</code></td></tr>`).join('') || emptyRow(4);
+}
+const emptyRow = (n) => `<tr><td colspan="${n}" class="muted">Aucune donnée</td></tr>`;
+
+async function injectTx(hour){
+  const d = new Date(); d.setHours(hour, Math.floor(Math.random()*60), 0, 0);
+  const rec = { member_id:'M-'+(9000+Math.floor(Math.random()*99)), agent_id:'A-'+(900+Math.floor(Math.random()*9)),
+    branch_id:'B-09', operation_type: hour>=17?'WITHDRAWAL':'DEPOSIT', amount: 50000+Math.floor(Math.random()*200000),
+    currency:'XOF', channel:'WEB', operation_date:d.toISOString(), validation_date:d.toISOString() };
+  const r = await (await fetch('/api/v1/ingest/webhook', { method:'POST',
+    headers:{'X-SIG-API-Key':apiKey,'Content-Type':'application/json'}, body: JSON.stringify({ data:[rec] }) })).json();
+  // Puis on relance l'audit pour matérialiser d'éventuelles alertes (ex. R3 hors-horaire)
+  await api('/api/v1/audit/run', { method:'POST', body: JSON.stringify({}) });
+  $('injectMsg').textContent = `Ancré via webhook (${r.anchored||0}) — audit relancé`;
+  toast('Transaction certifiée et auditée'); refresh();
+}
+
+async function genReport(){
+  $('reportMsg').textContent = 'Génération…';
+  const r = await (await api('/api/v1/reports/generate', { method:'POST', body: JSON.stringify({}) })).json();
+  lastReportId = r.reportId;
+  $('reportMsg').textContent = '';
+  $('reportBox').innerHTML = `<p class="muted">Report ID : <code>${r.reportId}</code> — ${r.events} événements, ${r.alerts} anomalies</p>
+    <div class="toolbar">
+      <button class="ghost" onclick="downloadReport()">⤓ Télécharger le PDF</button>
+      <button onclick="verifyReport()">Vérifier l'authenticité</button>
+      <span id="verifyBox"></span>
+    </div>`;
+}
+
+async function fetchReportBlob(){
+  const r = await api('/api/v1/reports/'+lastReportId+'/download');
+  return await r.blob();
+}
+async function downloadReport(){
+  const url = URL.createObjectURL(await fetchReportBlob());
+  const a = document.createElement('a'); a.href=url; a.download=lastReportId+'.pdf'; a.click();
+  URL.revokeObjectURL(url);
+}
+async function sha256Hex(buf){
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function verifyReport(){
+  const buf = await (await fetchReportBlob()).arrayBuffer();
+  const fileHash = await sha256Hex(buf);
+  const res = await (await api('/api/v1/reports/verify', { method:'POST',
+    body: JSON.stringify({ reportId: lastReportId, fileHash }) })).json();
+  $('verifyBox').innerHTML = `<span class="badge ${res.status}">${res.status}</span>`;
+}
+</script>
+</body>
+</html>

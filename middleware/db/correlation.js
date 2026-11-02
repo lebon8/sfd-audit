@@ -58,6 +58,10 @@ class CorrelationStore {
                    .filter((r) => !rule || r.rule_id === rule);
   }
 
+  async isIndexed(sigId) {
+    const r = await this.pool.query('SELECT 1 FROM mw.attested_index WHERE sig_id = $1 LIMIT 1', [sigId]);
+    return r.rowCount > 0;
+  }
   async close() { await this.pool.end(); }
 }
 

@@ -30,9 +30,20 @@ async function generateReport(periodFrom, periodTo) {
   try {
     const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
     const events = [];
+    let orphans = 0;
     for (const row of indexed) {
-      const evt = JSON.parse(await gateway.evaluate('getAttestedEvent', row.event_id));
-      events.push({ eventType: evt.eventType, sigId: row.sig_id, data: JSON.parse(evt.payload).data });
+      try {
+        const evt = JSON.parse(await gateway.evaluate('getAttestedEvent', row.event_id));
+        const payload = JSON.parse(evt.payload);
+        events.push({ eventType: evt.eventType,
+                      sigId: row.sig_id, data: payload.data });
+      } catch (e) {
+        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        else throw e;
+      }
+    }
+    if (orphans > 0) {
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
     }
     const alerts = await store.findAlertsForSigIds(events.map((e) => e.sigId));
     const stats = computeStats(events);
@@ -83,4 +94,31 @@ async function verifyReportByHash(reportId, fileHash) {
   } finally { gateway.close(); }
 }
 
-module.exports = { generateReport, verifyReport, verifyReportByHash };
+async function getStats(periodFrom, periodTo) {
+  const gateway = new GatewayClient().connect();
+  const store = new CorrelationStore();
+  try {
+    const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
+    const events = [];
+    let orphans = 0;
+    for (const row of indexed) {
+      try {
+        const evt = JSON.parse(await gateway.evaluate('getAttestedEvent', row.event_id));
+        const payload = JSON.parse(evt.payload);
+        events.push({ eventType: evt.eventType,
+                      sigId: row.sig_id, data: payload.data });
+      } catch (e) {
+        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        else throw e;
+      }
+    }
+    if (orphans > 0) {
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
+    }
+    const alerts = await store.findAlerts({});
+    return { ...computeStats(events), totalAlerts: alerts.length,
+             alertsBySeverity: alerts.reduce((a, x) => ((a[x.severity] = (a[x.severity] || 0) + 1), a), {}) };
+  } finally { await store.close(); gateway.close(); }
+}
+
+module.exports = { generateReport, verifyReport, verifyReportByHash, getStats };

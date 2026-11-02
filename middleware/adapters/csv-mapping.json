@@ -1,0 +1,11 @@
+{
+  "transaction_id": "id_operation",
+  "member_id": "code_membre",
+  "agent_id": "code_agent",
+  "branch_id": "code_guichet",
+  "operation_type": "nature",
+  "amount": "montant",
+  "currency": "devise",
+  "channel": "canal",
+  "operation_date": "date_operation"
+}

@@ -26,11 +26,20 @@ async function runAuditCycle(periodFrom, periodTo) {
     const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
 
     const events = [];
+    let orphans = 0;
     for (const row of indexed) {
-      const evt = JSON.parse(await gateway.evaluate('getAttestedEvent', row.event_id));
-      const payload = JSON.parse(evt.payload);
-      events.push({ eventId: evt.eventId, eventType: evt.eventType,
-                    sigId: row.sig_id, txId: row.blockchain_tx_id, data: payload.data });
+      try {
+        const evt = JSON.parse(await gateway.evaluate('getAttestedEvent', row.event_id));
+        const payload = JSON.parse(evt.payload);
+        events.push({ eventId: evt.eventId, eventType: evt.eventType,
+                      sigId: row.sig_id, txId: row.blockchain_tx_id, data: payload.data });
+      } catch (e) {
+        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        else throw e;
+      }
+    }
+    if (orphans > 0) {
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
     }
 
     const engine = new AuditEngine(loadRules(RULES_CONFIG));

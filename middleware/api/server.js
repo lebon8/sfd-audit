@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const { shutdown } = require('./context');
+const path = require('path'); 
 
 const app = express();
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
@@ -16,6 +17,8 @@ app.use('/api/v1/events',  require('./routes/query'));
 app.use('/api/v1/verify',  require('./routes/verify'));
 app.use('/api/v1/audit',   require('./routes/audit'));
 app.use('/api/v1/reports', require('./routes/reports'));
+app.use('/api/v1/stats', require('./routes/stats'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = Number(process.env.API_PORT || 3000);
 const server = app.listen(PORT, () => console.log(`API SFD AgnosticTrace sur http://localhost:${PORT}`));
