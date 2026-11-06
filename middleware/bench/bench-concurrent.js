@@ -1,12 +1,16 @@
 'use strict';
-require('dotenv').config();
-const { GatewayClient } = require('../fabric-gateway/gateway');
+//require('dotenv').config();
+const path = require('path');
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../.env')
+});
+const { RoleGatewayClient } = require('../fabric-gateway/role-gateway');
 const { makeEvent } = require('./gen-events');
 const { summarize, arg } = require('./stats');
 
 // Un "producteur" = un SIG independant, avec sa propre connexion gateway
 async function producer(id, perProducer, latencies, tally) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('writer').connect();
   try {
     for (let i = 0; i < perProducer; i++) {
       const e = makeEvent(i, `SIG${id}`);

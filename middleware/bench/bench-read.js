@@ -1,6 +1,10 @@
 'use strict';
-require('dotenv').config();
-const { GatewayClient } = require('../fabric-gateway/gateway');
+//require('dotenv').config();
+const path = require('path');
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../.env')
+});
+const { RoleGatewayClient } = require('../fabric-gateway/role-gateway');
 const { CorrelationStore } = require('../db/correlation');
 const { summarize, runWithConcurrency, arg } = require('./stats');
 
@@ -13,7 +17,7 @@ const { summarize, runWithConcurrency, arg } = require('./stats');
   await store.close();
   if (rows.length === 0) { console.log('Aucun evenement indexe. Lancez bench-write --index d abord.'); process.exit(0); }
 
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('reader').connect();
   const latencies = []; let ok = 0, ko = 0;
 
   const wall0 = Date.now();

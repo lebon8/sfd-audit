@@ -2,7 +2,7 @@
 require('dotenv').config();
 const path = require('path');
 const CSVAdapter = require('./adapters/csv-adapter');
-const { GatewayClient } = require('./fabric-gateway/gateway');
+const { RoleGatewayClient } = require('./fabric-gateway/role-gateway');
 const { CorrelationStore } = require('./db/correlation');
 const { anchorEnvelopes } = require('./ingest-core');
 
@@ -14,7 +14,7 @@ const mapping = require('./adapters/csv-mapping.json');
   await adapter.connect();
   const envelopes = await adapter.consume();
 
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('writer').connect();
   const store = new CorrelationStore();
   try {
     const r = await anchorEnvelopes(envelopes, { gateway, store });

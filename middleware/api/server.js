@@ -5,8 +5,11 @@ const { shutdown } = require('./context');
 const path = require('path'); 
 
 const app = express();
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
-  console.warn('[securite] JWT_SECRET faible ou absent — definissez-en un fort dans .env');
+if (!process.env.JWT_SECRET || Buffer.byteLength(process.env.JWT_SECRET, 'utf8') < 32) {
+  console.warn('[securite] JWT_SECRET absent ou trop court — 32 octets minimum dans .env');
+}
+if (!process.env.SIG_API_KEY || Buffer.byteLength(process.env.SIG_API_KEY, 'utf8') < 32) {
+  console.warn('[securite] SIG_API_KEY absent ou trop court — 32 octets minimum dans .env');
 }
 app.use(express.json({ limit: '1mb' }));
 

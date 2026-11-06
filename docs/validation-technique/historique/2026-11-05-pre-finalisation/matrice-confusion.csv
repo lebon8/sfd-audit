@@ -1,0 +1,8 @@
+metric,value
+TP,50
+FP,0
+TN,950
+FN,0
+precision,1
+recall,1
+f1_score,1

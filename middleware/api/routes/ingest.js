@@ -19,7 +19,7 @@ router.post('/webhook', requireApiKey, async (req, res) => {
     const body = req.body || {};
     const records = Array.isArray(body.data) ? body.data : (Array.isArray(body) ? body : [body]);
     const envelopes = new WebhookAdapter().toEnvelopes(records);
-    const r = await anchorEnvelopes(envelopes, { gateway: getGateway(), store: getStore() });
+    const r = await anchorEnvelopes(envelopes, { gateway: getGateway('writer'), store: getStore() });
     res.json({ status: 'ok', mode: 'webhook', ...r });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

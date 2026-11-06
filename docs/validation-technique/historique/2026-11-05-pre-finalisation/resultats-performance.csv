@@ -1,0 +1,11 @@
+type,essai,volume_demande,concurrence,succes,échecs,debit_ops_s,moyenne_ms,mediane_ms,p95_ms,min_ms,max_ms,statut,raison
+écriture,1,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune transaction Fabric exécutée
+écriture,2,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune transaction Fabric exécutée
+écriture,3,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune transaction Fabric exécutée
+écriture,4,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune transaction Fabric exécutée
+écriture,5,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune transaction Fabric exécutée
+lecture,1,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune lecture Fabric exécutée
+lecture,2,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune lecture Fabric exécutée
+lecture,3,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune lecture Fabric exécutée
+lecture,4,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune lecture Fabric exécutée
+lecture,5,1000,50,,,,,,,,,BLOQUÉ,Peer/orderer arrêtés; aucune lecture Fabric exécutée

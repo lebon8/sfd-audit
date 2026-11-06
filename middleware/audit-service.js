@@ -1,7 +1,8 @@
 'use strict';
 const path = require('path');
 const { canonicalStringify, sha256Hex } = require('./engine/hasher');
-const { GatewayClient } = require('./fabric-gateway/gateway');
+const { RoleGatewayClient } = require('./fabric-gateway/role-gateway');
+const { isMissingLedgerRecord } = require('./fabric-gateway/errors');
 const { CorrelationStore } = require('./db/correlation');
 const { AuditEngine, loadRules } = require('./audit/audit-engine');
 const { signAlert } = require('./audit/alert-signer');
@@ -16,11 +17,14 @@ function alertIdFor(ruleId, relatedTxIds) {
 // Pre-check on-chain : evaluate (lecture) ne modifie rien et evite une endorsement vouee a l'echec
 async function alertExists(gateway, alertId) {
   try { await gateway.evaluate('getAuditAlert', alertId); return true; }
-  catch { return false; }   // le chaincode leve "introuvable" si absente
+  catch (error) {
+    if (isMissingLedgerRecord(error)) return false;
+    throw error;
+  }
 }
 
 async function runAuditCycle(periodFrom, periodTo) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('auditor').connect();
   const store = new CorrelationStore();
   try {
     const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
@@ -34,12 +38,12 @@ async function runAuditCycle(periodFrom, periodTo) {
         events.push({ eventId: evt.eventId, eventType: evt.eventType,
                       sigId: row.sig_id, txId: row.blockchain_tx_id, data: payload.data });
       } catch (e) {
-        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        if (isMissingLedgerRecord(e)) orphans++;   // index desynchronise du ledger
         else throw e;
       }
     }
     if (orphans > 0) {
-      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Reconciliation manuelle requise; aucune reinitialisation n'a ete effectuee.`);
     }
 
     const engine = new AuditEngine(loadRules(RULES_CONFIG));

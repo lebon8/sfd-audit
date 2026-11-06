@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 # Orchestration de la stack SFD AgnosticTrace
-set -uo pipefail
+set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 set -a; [ -f .env ] && . ./.env; set +a
 
-TN="${FABRIC_TN:?Definir FABRIC_TN dans .env}"
-CHANNEL="${FABRIC_CHANNEL:-sfdchannel}"
-CC_NAME="${FABRIC_CHAINCODE:-agnostictrace}"
-CC_PATH="$PROJECT_DIR/chaincode/agnostic-trace"
 API_PORT="${API_PORT:-3000}"
 PID_FILE="$PROJECT_DIR/.api.pid"
 API_LOG="$PROJECT_DIR/api.log"
@@ -31,23 +27,17 @@ stop_api() {
 
 case "${1:-}" in
   up)
-    echo "== 1/4 Reseau Fabric =="
-    ( cd "$TN" && ./network.sh down && ./network.sh up createChannel -c "$CHANNEL" )
-    echo "== 2/4 Deploiement chaincode =="
-    ( cd "$TN" && ./network.sh deployCC -ccn "$CC_NAME" -ccp "$CC_PATH" -ccl javascript -c "$CHANNEL" )
-    echo "== 3/4 PostgreSQL =="
+    echo "== 1/2 PostgreSQL =="
     docker compose up -d postgres
-    echo "  (note: la base Postgres persiste; si l'audit signale des orphelins, lancez ./stack.sh reset)"
-    echo "== 4/4 API =="
+    echo "== 2/2 API =="
     sleep 3; start_api
-    echo "Stack demarree. Peupler avec : ./stack.sh seed"
+    echo "Services locaux demarres. Le reseau Fabric et le chaincode n'ont pas ete modifies."
     ;;
   down)
     echo "Arret de la stack..."
     stop_api
     docker compose down
-    ( cd "$TN" && ./network.sh down )
-    echo "Stack arretee."
+    echo "API et PostgreSQL arretes. Fabric et son ledger n'ont pas ete modifies."
     ;;
   seed)
     node sig-simulator/generator.js --count "${2:-50}"
@@ -56,11 +46,9 @@ case "${1:-}" in
     node middleware/run-report.js
     ;;
   reset)
-    echo "Reinitialisation COHERENTE (ledger + base)..."
-    stop_api
-    docker compose down -v            # -v : supprime le volume Postgres
-    ( cd "$TN" && ./network.sh down )
-    "$0" up
+    echo "Reinitialisation destructive desactivee pour proteger le ledger Fabric et les donnees PostgreSQL." >&2
+    echo "Aucune action effectuee; toute reinitialisation necessite un plan et une autorisation explicites." >&2
+    exit 2
     ;;
   status)
     docker ps --format "table {{.Names}}\t{{.Status}}"; echo "---"

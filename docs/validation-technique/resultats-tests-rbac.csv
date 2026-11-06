@@ -1,0 +1,40 @@
+Identité,Opération,Autorisation attendue,Résultat observé,État,Preuve / limite
+writer,createAttestedEvent,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,createAttestedEvent,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,createAttestedEvent,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,getAttestedEvent,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,getAttestedEvent,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,getAttestedEvent,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,verifyEventIntegrity,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,verifyEventIntegrity,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,verifyEventIntegrity,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,createAuditAlert,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,createAuditAlert,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,createAuditAlert,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,getAuditAlert,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,getAuditAlert,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,getAuditAlert,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,certifyReport,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,certifyReport,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,certifyReport,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+writer,getReportCertification,Refusé,Refusé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+reader,getReportCertification,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+auditor,getReportCertification,Autorisé,Autorisé par contrat simulé,RÉUSSI,middleware/tests/chaincode.test.js; test unitaire simulé
+Org1MSP identifiée,createAttestedEvent,Org1MSP seulement,Org1MSP autorisé dans le test,RÉUSSI,middleware/tests/chaincode.test.js; simulation uniquement
+Autre MSP,createAttestedEvent,Refusé,Refusé,RÉUSSI,middleware/tests/chaincode.test.js; simulation uniquement
+Certificat sans rôle,createAttestedEvent,Refusé,Refusé,RÉUSSI,middleware/tests/chaincode.test.js; simulation uniquement
+Rôle inconnu,createAttestedEvent,Refusé,Refusé,RÉUSSI,middleware/tests/chaincode.test.js; simulation uniquement
+Identités writer/reader/auditor réelles,Suite RBAC Fabric (3 tests),Matrice autorisée/refusée selon rôle,Non exécutée,BLOQUÉ,Peer/orderer arrêtés; les tests créent événement alerte et certification dans le ledger
+JWT writer,GET /api/v1/events/:eventId,Refusé pour rôle reader/auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,POST /api/v1/verify,Refusé pour rôle reader/auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,GET /api/v1/audit/alerts,Refusé pour rôle auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,POST /api/v1/audit/run,Refusé pour rôle auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,POST /api/v1/reports/generate,Refusé pour rôle auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,GET /api/v1/reports/:reportId/download,Refusé pour rôle reader/auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,POST /api/v1/reports/verify,Refusé pour rôle reader/auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+JWT writer,GET /api/v1/stats,Refusé pour rôle reader/auditor,HTTP 403,RÉUSSI,middleware/tests/api-rbac.test.js; serveur de test local
+Client demande un rôle writer,POST /api/v1/auth/token,Le client ne choisit pas son rôle; seul auditor émis,JWT signé contient sfd_auditor,RÉUSSI,middleware/tests/api-rbac.test.js; secrets de test locaux
+Sans clé API,POST /api/v1/auth/token,Refusé,503 si clé absente/faible,RÉUSSI,middleware/tests/auth.test.js; test unitaire
+Mauvaise clé API,Route protégée par clé API,Refusé,401,RÉUSSI,middleware/tests/auth.test.js; test unitaire
+Sans JWT,Route protégée par JWT,Refusé,401,RÉUSSI,middleware/tests/auth.test.js; test unitaire
+JWT invalide,Route protégée par JWT,Refusé,401,RÉUSSI,middleware/tests/auth.test.js; test unitaire

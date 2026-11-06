@@ -35,13 +35,60 @@ class AgnosticTrace extends Contract {
     }
   }
 
-  // ---------- Evenements attestes ----------
+  _requireSha256(value, name) {
+    this._require(value, name);
+    if (typeof value !== 'string' || !/^[a-f0-9]{64}$/i.test(value)) {
+      throw new Error(`${name} doit etre une empreinte SHA-256 hexadecimale`);
+    }
+  }
 
+  _parseJsonObject(value, name) {
+    this._require(value, name);
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new Error(`${name} doit etre un objet JSON valide`);
+    }
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`${name} doit etre un objet JSON valide`);
+    }
+    return parsed;
+  }
+
+  _requireRole(ctx, allowedRoles) {
+    const clientIdentity = ctx?.clientIdentity;
+    if (!clientIdentity
+        || typeof clientIdentity.getMSPID !== 'function'
+        || typeof clientIdentity.getAttributeValue !== 'function') {
+      throw new Error('Acces refuse : identite cliente non reconnue');
+    }
+
+    const mspId = clientIdentity.getMSPID();
+    if (mspId !== 'Org1MSP') {
+      throw new Error(`Organisation non autorisée : ${mspId}`);
+    }
+
+    const role = clientIdentity.getAttributeValue('role');
+    if (!role) {
+      throw new Error('Accès refusé : aucun rôle attribué au certificat');
+    }
+
+    if (!allowedRoles.includes(role)) {
+      throw new Error(`Accès refusé : rôle ${role} non autorisé`);
+    }
+  }
+
+  // ---------- Evenements attestes ----------
   async createAttestedEvent(ctx, eventId, eventType, payloadJson, sourceHash) {
+    this._requireRole(ctx, ['sfd_writer']);
     this._require(eventId, 'eventId');
     this._require(eventType, 'eventType');
-    this._require(payloadJson, 'payloadJson');
-    this._require(sourceHash, 'sourceHash');
+    if (!['TRANSACTION', 'LOG', 'AUDIT', 'ALERT'].includes(eventType)) {
+      throw new Error('eventType non autorise');
+    }
+    this._parseJsonObject(payloadJson, 'payloadJson');
+    this._requireSha256(sourceHash, 'sourceHash');
 
     const key = this._key('event', eventId);
     if (await this._getOrNull(ctx, key)) {
@@ -64,6 +111,7 @@ class AgnosticTrace extends Contract {
   }
 
   async getAttestedEvent(ctx, eventId) {          // NOUVEAU (A1)
+    this._requireRole(ctx, ['sfd_reader', 'sfd_auditor']);
     this._require(eventId, 'eventId');
     const event = await this._getOrNull(ctx, this._key('event', eventId));
     if (!event) {
@@ -73,8 +121,9 @@ class AgnosticTrace extends Contract {
   }
 
   async verifyEventIntegrity(ctx, eventId, recomputedPayloadJson) {
+    this._requireRole(ctx, ['sfd_reader', 'sfd_auditor']);
     this._require(eventId, 'eventId');
-    this._require(recomputedPayloadJson, 'recomputedPayloadJson');
+    this._parseJsonObject(recomputedPayloadJson, 'recomputedPayloadJson');
 
     const event = await this._getOrNull(ctx, this._key('event', eventId));
     if (!event) {
@@ -93,10 +142,14 @@ class AgnosticTrace extends Contract {
   // ---------- Alertes d'audit ----------
 
   async createAuditAlert(ctx, alertId, ruleId, severity, relatedTxIdsJson, signature) {
+    this._requireRole(ctx, ['sfd_auditor']);
     this._require(alertId, 'alertId');
     this._require(ruleId, 'ruleId');
     this._require(severity, 'severity');
     this._require(signature, 'signature');
+    if (!['LOW', 'MEDIUM', 'HIGH'].includes(severity)) {
+      throw new Error('severity non autorisee');
+    }
 
     const key = this._key('alert', alertId);
     if (await this._getOrNull(ctx, key)) {
@@ -106,8 +159,12 @@ class AgnosticTrace extends Contract {
     let relatedTxIds;
     try {
       relatedTxIds = JSON.parse(relatedTxIdsJson);
-    } catch (e) {
+    } catch {
       throw new Error('relatedTxIdsJson doit etre un tableau JSON valide');
+    }
+    if (!Array.isArray(relatedTxIds)
+        || relatedTxIds.some((txId) => typeof txId !== 'string' || txId.trim() === '')) {
+      throw new Error('relatedTxIdsJson doit contenir un tableau d identifiants non vides');
     }
 
     const alert = {
@@ -125,6 +182,7 @@ class AgnosticTrace extends Contract {
   }
 
   async getAuditAlert(ctx, alertId) {             // NOUVEAU (A1)
+    this._requireRole(ctx, ['sfd_auditor']);
     this._require(alertId, 'alertId');
     const alert = await this._getOrNull(ctx, this._key('alert', alertId));
     if (!alert) {
@@ -136,8 +194,9 @@ class AgnosticTrace extends Contract {
   // ---------- Certification de rapports ----------
 
   async certifyReport(ctx, reportId, reportHash, periodFrom, periodTo) {
+    this._requireRole(ctx, ['sfd_auditor']);
     this._require(reportId, 'reportId');
-    this._require(reportHash, 'reportHash');
+    this._requireSha256(reportHash, 'reportHash');
 
     const key = this._key('report', reportId);
     if (await this._getOrNull(ctx, key)) {
@@ -159,6 +218,7 @@ class AgnosticTrace extends Contract {
   }
 
   async getReportCertification(ctx, reportId) {
+    this._requireRole(ctx, ['sfd_reader', 'sfd_auditor']);
     this._require(reportId, 'reportId');
     const cert = await this._getOrNull(ctx, this._key('report', reportId));
     if (!cert) {

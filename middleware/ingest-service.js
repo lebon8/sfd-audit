@@ -3,48 +3,55 @@ const JDBCAdapter = require('./adapters/jdbc-adapter');
 const { toPivot } = require('./engine/canonical-mapper');
 const { canonicalStringify } = require('./engine/hasher');
 const { validateEvent } = require('./engine/validator');
-const { GatewayClient } = require('./fabric-gateway/gateway');
+const { RoleGatewayClient } = require('./fabric-gateway/role-gateway');
 const { CorrelationStore } = require('./db/correlation');
 
 async function runIngestCycle() {
   const adapter = new JDBCAdapter();
-  const gateway = new GatewayClient();
+  const gateway = new RoleGatewayClient('writer');
   const store = new CorrelationStore();
+  try {
+    await adapter.connect();
+    gateway.connect();
 
-  await adapter.connect();
-  gateway.connect();
+    const envelopes = await adapter.consume();
+    let anchored = 0, failed = 0, rejected = 0;
 
-  const envelopes = await adapter.consume();
-  let anchored = 0, failed = 0, rejected = 0;
+    for (const env of envelopes) {
+      const pivot = toPivot(env);
 
-  for (const env of envelopes) {
-    const pivot = toPivot(env);
+      const { valid, errors } = validateEvent(pivot);   // defense en profondeur
+      if (!valid) {
+        console.error(`Evenement ${env.sigId} rejete (schema) : ${errors.join('; ')}`);
+        rejected++;
+        continue;
+      }
 
-    const { valid, errors } = validateEvent(pivot);   // defense en profondeur
-    if (!valid) {
-      console.error(`Evenement ${env.sigId} rejete (schema) : ${errors.join('; ')}`);
-      rejected++;
-      continue;
+      const { eventId, eventType, eventTimestamp } = pivot.eventMetadata;
+      const payloadJson = canonicalStringify(pivot.payload);
+      const sourceHash = pivot.integrityProof.sourceHash;
+
+      try {
+        const { txId } = await gateway.submit('createAttestedEvent', eventId, eventType, payloadJson, sourceHash);
+        await store.recordAttestation({ eventId, sigId: env.sigId, eventType, sourceHash, blockchainTxId: txId, eventTimestamp });
+        anchored++;
+      } catch (e) {
+        console.error(`Echec ancrage ${env.sigId} : ${e.message}`);
+        failed++;
+      }
     }
-
-    const { eventId, eventType, eventTimestamp } = pivot.eventMetadata;
-    const payloadJson = canonicalStringify(pivot.payload);
-    const sourceHash = pivot.integrityProof.sourceHash;
-
+    return { consumed: envelopes.length, anchored, failed, rejected };
+  } finally {
     try {
-      const { txId } = await gateway.submit('createAttestedEvent', eventId, eventType, payloadJson, sourceHash);
-      await store.recordAttestation({ eventId, sigId: env.sigId, eventType, sourceHash, blockchainTxId: txId, eventTimestamp });
-      anchored++;
-    } catch (e) {
-      console.error(`Echec ancrage ${env.sigId} : ${e.message}`);
-      failed++;
+      await adapter.disconnect();
+    } finally {
+      try {
+        await store.close();
+      } finally {
+        gateway.close();
+      }
     }
   }
-
-  await adapter.disconnect();
-  await store.close();
-  gateway.close();
-  return { consumed: envelopes.length, anchored, failed, rejected };
 }
 
 module.exports = { runIngestCycle };

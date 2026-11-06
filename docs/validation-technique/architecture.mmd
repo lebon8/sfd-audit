@@ -1,0 +1,39 @@
+flowchart LR
+  SIG[SIG simulator / source system]
+  PG[(PostgreSQL<br/>sig.transactions<br/>sig.audit_logs<br/>mw.attested_index<br/>mw.alert_index)]
+  API[Node.js API<br/>API key / JWT]
+  MAP[Adapters + canonical mapper<br/>validation + SHA-256]
+  GW[RoleGatewayClient<br/>writer / reader / auditor]
+  PEER[Fabric Gateway to peer0 Org1<br/>localhost:7051]
+  CC[agnostictrace chaincode<br/>Org1MSP role attribute]
+  LEDGER[(Fabric ledger<br/>event payload, sourceHash,<br/>blockchainHash, alerts, report hashes)]
+  AUDIT[AuditEngine<br/>rules R1-R5]
+  SIGN[Ed25519 alert signer]
+  PDF[PDF builder / local reports directory]
+  CLIENT[Reader / auditor clients]
+
+  SIG -->|business rows| PG
+  CLIENT --> API
+  API -->|POST /ingest: poll JDBC| PG
+  API -->|POST /ingest/webhook| MAP
+  PG -->|unindexed source rows| MAP
+  MAP -->|canonical payload + sourceHash| GW
+  GW --> PEER --> CC --> LEDGER
+  CC -->|commit result / txId| GW
+  GW -->|recordAttestation after commit| PG
+
+  API -->|audit request| AUDIT
+  PG -->|period index rows| AUDIT
+  AUDIT -->|evaluate getAttestedEvent| GW
+  LEDGER -->|full stored payload| GW
+  AUDIT --> SIGN -->|createAuditAlert| GW
+  GW -->|record alert after commit| PG
+
+  API -->|generate report| PDF
+  PG -->|correlations and alert index| PDF
+  GW -->|get attested payloads| PDF
+  PDF -->|PDF written locally; SHA-256| GW
+  GW -->|certifyReport: hash only| LEDGER
+
+  API -->|verify: caller supplies payload| GW
+  GW -->|verifyEventIntegrity| LEDGER

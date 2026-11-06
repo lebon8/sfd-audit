@@ -2,7 +2,8 @@
 const fs = require('fs');
 const path = require('path');
 const { randomBytes } = require('crypto');
-const { GatewayClient } = require('./fabric-gateway/gateway');
+const { RoleGatewayClient } = require('./fabric-gateway/role-gateway');
+const { isMissingLedgerRecord } = require('./fabric-gateway/errors');
 const { CorrelationStore } = require('./db/correlation');
 const { buildReportPdf } = require('./reporting/report-builder');
 const { hashBuffer } = require('./reporting/report-signer');
@@ -25,7 +26,7 @@ function computeStats(events) {
 }
 
 async function generateReport(periodFrom, periodTo) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('auditor').connect();
   const store = new CorrelationStore();
   try {
     const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
@@ -38,12 +39,12 @@ async function generateReport(periodFrom, periodTo) {
         events.push({ eventType: evt.eventType,
                       sigId: row.sig_id, data: payload.data });
       } catch (e) {
-        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        if (isMissingLedgerRecord(e)) orphans++;   // index desynchronise du ledger
         else throw e;
       }
     }
     if (orphans > 0) {
-      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Reconciliation manuelle requise; aucune reinitialisation n'a ete effectuee.`);
     }
     const alerts = await store.findAlertsForSigIds(events.map((e) => e.sigId));
     const stats = computeStats(events);
@@ -68,12 +69,17 @@ async function generateReport(periodFrom, periodTo) {
 }
 
 async function verifyReport(reportId, filePath) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('reader').connect();
   try {
     const fileHash = hashBuffer(fs.readFileSync(filePath));
     let cert;
     try { cert = JSON.parse(await gateway.evaluate('getReportCertification', reportId)); }
-    catch { return { status: 'UNKNOWN', message: 'Rapport non certifie ou introuvable' }; }
+    catch (error) {
+      if (isMissingLedgerRecord(error)) {
+        return { status: 'UNKNOWN', message: 'Rapport non certifie ou introuvable' };
+      }
+      throw error;
+    }
     return {
       status: fileHash === cert.reportHash ? 'VALID' : 'TAMPERED',
       reportId, anchoredHash: cert.reportHash, fileHash, certifiedAt: cert.certifiedAt,
@@ -84,18 +90,23 @@ async function verifyReport(reportId, filePath) {
 }
 
 async function verifyReportByHash(reportId, fileHash) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('reader').connect();
   try {
     let cert;
     try { cert = JSON.parse(await gateway.evaluate('getReportCertification', reportId)); }
-    catch { return { status: 'UNKNOWN', message: 'Rapport non certifie ou introuvable' }; }
+    catch (error) {
+      if (isMissingLedgerRecord(error)) {
+        return { status: 'UNKNOWN', message: 'Rapport non certifie ou introuvable' };
+      }
+      throw error;
+    }
     return { status: fileHash === cert.reportHash ? 'VALID' : 'TAMPERED',
              reportId, anchoredHash: cert.reportHash, fileHash, certifiedAt: cert.certifiedAt };
   } finally { gateway.close(); }
 }
 
 async function getStats(periodFrom, periodTo) {
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('reader').connect();
   const store = new CorrelationStore();
   try {
     const indexed = await store.findEventsByPeriod(periodFrom, periodTo);
@@ -108,12 +119,12 @@ async function getStats(periodFrom, periodTo) {
         events.push({ eventType: evt.eventType,
                       sigId: row.sig_id, data: payload.data });
       } catch (e) {
-        if (/introuvable/.test(e.message)) orphans++;   // index desynchronise du ledger
+        if (isMissingLedgerRecord(e)) orphans++;   // index desynchronise du ledger
         else throw e;
       }
     }
     if (orphans > 0) {
-      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Executez : ./stack.sh reset`);
+      console.warn(`[audit] ${orphans} evenement(s) indexe(s) absent(s) du ledger (index desynchronise). Reconciliation manuelle requise; aucune reinitialisation n'a ete effectuee.`);
     }
     const alerts = await store.findAlerts({});
     return { ...computeStats(events), totalAlerts: alerts.length,

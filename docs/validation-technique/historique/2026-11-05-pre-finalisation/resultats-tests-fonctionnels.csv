@@ -1,0 +1,8 @@
+Test,Cas demandés,Réussites,Échecs,Bloqués,Observations
+Enregistrement,20 opérations,0,0,20,"Peer/orderer arrêtés et PostgreSQL indisponible; aucun test réel lancé"
+Lecture,20 lectures,0,0,20,"Aucun accès Fabric/DB; aucun test réel lancé"
+Intégrité,100 créations puis 20 altérations et 100 vérifications,0,0,100,"Aucune base de test isolée; le endpoint verify accepte un payload fourni par le client et ne recharge pas PostgreSQL"
+Suppression ou indisponibilité,10 créations puis 5 suppressions simulées,0,0,10,"Bloqué; aucune suppression effectuée et aucune isolation PostgreSQL démontrée"
+Doublons,10 scénarios,0,0,10,"Bloqué; pas de ledger actif; index sig_id sans contrainte unique"
+Concurrence,100 à concurrence 10 puis 500 à concurrence 25,0,0,600,"Bloqué; écrirait dans Fabric/PostgreSQL et réseau indisponible"
+Cohérence PostgreSQL/Fabric,5 catégories de cohérence,0,0,5,"Bloqué; peer/orderer et PostgreSQL indisponibles"

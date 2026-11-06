@@ -1,9 +1,14 @@
 'use strict';
-require('dotenv').config();
-const { GatewayClient } = require('../fabric-gateway/gateway');
+//require('dotenv').config();
+const path = require('path');
+require('dotenv').config({
+  path: path.resolve(__dirname, '../../.env')
+});
+const { RoleGatewayClient } = require('../fabric-gateway/role-gateway');
 const { CorrelationStore } = require('../db/correlation');
 const { makeEvent } = require('./gen-events');
 const { summarize, runWithConcurrency, arg } = require('./stats');
+
 
 (async () => {
   const count = parseInt(arg('--count', '1000'), 10);
@@ -11,7 +16,7 @@ const { summarize, runWithConcurrency, arg } = require('./stats');
   const doIndex = process.argv.includes('--index');   // pour préparer l'audit ensuite
 
   const events = Array.from({ length: count }, (_, i) => makeEvent(i));
-  const gateway = new GatewayClient().connect();
+  const gateway = new RoleGatewayClient('writer').connect();
   const store = doIndex ? new CorrelationStore() : null;
 
   const latencies = [];

@@ -1,0 +1,21 @@
+sequenceDiagram
+  participant SIG as SIG / source system
+  participant PG as PostgreSQL
+  participant API as Node.js API
+  participant MAP as JDBCAdapter + mapper/hasher
+  participant GW as RoleGatewayClient(writer)
+  participant CC as Fabric peer / chaincode
+
+  SIG->>PG: Store operational transaction or audit log
+  Note over PG: Existing business data; no test writes were made
+  API->>MAP: POST /api/v1/ingest (API key)
+  MAP->>PG: Select unindexed source rows
+  PG-->>MAP: Raw source row
+  MAP->>MAP: Normalize, validate, canonicalize payload\nSHA-256 of raw source row
+  MAP->>GW: createAttestedEvent(eventId, eventType,\npayloadJson, sourceHash)
+  GW->>CC: Endorse, order and submit as writer identity
+  CC->>CC: Check Org1MSP + role=sfd_writer;\nstore payload and hashes
+  CC-->>GW: Commit status, txId, result
+  GW-->>MAP: Successful commit
+  MAP->>PG: Insert mw.attested_index correlation
+  Note over PG,CC: Fabric commit and PostgreSQL insert are not atomic;\nPostgreSQL failure can leave an unindexed ledger event
